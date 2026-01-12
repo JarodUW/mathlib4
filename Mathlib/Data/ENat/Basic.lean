@@ -286,15 +286,26 @@ lemma lt_one_iff_eq_zero : n < 1 ↔ n = 0 :=
 theorem lt_add_one_iff (hm : n ≠ ⊤) : m < n + 1 ↔ m ≤ n :=
   Order.lt_add_one_iff_of_not_isMax (not_isMax_iff_ne_top.mpr hm)
 
+theorem add_le_add_iff_left {m n k : ENat} (h : k ≠ ⊤) :
+    k + n ≤ k + m ↔ n ≤ m :=
+  WithTop.add_le_add_iff_left h
+
+theorem add_le_add_iff_right {m n k : ENat} (h : k ≠ ⊤) :
+    n + k ≤ m + k ↔ n ≤ m :=
+  WithTop.add_le_add_iff_right h
+
+theorem lt_add_one_iff' {m n : ENat} (hm : m ≠ ⊤) :
+    m < n + 1 ↔ m ≤ n := by
+  rw [← add_one_le_iff hm, add_le_add_iff_right one_ne_top]
+
 theorem lt_coe_add_one_iff {m : ℕ∞} {n : ℕ} : m < n + 1 ↔ m ≤ n :=
   lt_add_one_iff (coe_ne_top n)
 
 theorem le_coe_iff {n : ℕ∞} {k : ℕ} : n ≤ ↑k ↔ ∃ (n₀ : ℕ), n = n₀ ∧ n₀ ≤ k :=
   WithTop.le_coe_iff
 
-@[simp]
-lemma not_lt_zero (n : ℕ∞) : ¬ n < 0 := by
-  cases n <;> simp
+@[deprecated not_lt_zero (since := "2025-12-03")]
+protected lemma not_lt_zero (n : ℕ∞) : ¬ n < 0 := not_lt_zero
 
 @[simp]
 lemma coe_lt_top (n : ℕ) : (n : ℕ∞) < ⊤ :=
@@ -376,12 +387,6 @@ lemma add_left_injective_of_ne_top {n : ℕ∞} (hn : n ≠ ⊤) : Function.Inje
 lemma add_right_injective_of_ne_top {n : ℕ∞} (hn : n ≠ ⊤) : Function.Injective (n + ·) := by
   simp_rw [add_comm n _]
   exact add_left_injective_of_ne_top hn
-
-lemma add_right_cancel_iff (a b c : ℕ∞) (netop : c ≠ ⊤) : a + c = b + c ↔ a = b :=
-  ⟨fun h ↦ ENat.add_left_injective_of_ne_top netop h, fun h ↦ by rw [h]⟩
-
-lemma add_left_cancel_iff (a b c : ℕ∞) (netop : c ≠ ⊤) : c + a = c + b ↔ a = b :=
-  ⟨fun h ↦ ENat.add_right_injective_of_ne_top netop h, fun h ↦ by rw [h]⟩
 
 lemma mul_right_strictMono (ha : a ≠ 0) (h_top : a ≠ ⊤) : StrictMono (a * ·) :=
   WithTop.mul_right_strictMono (pos_iff_ne_zero.2 ha) h_top
@@ -592,21 +597,26 @@ lemma WithBot.add_one_le_iff {n : ℕ} {m : WithBot ℕ∞} : n + 1 ≤ m ↔ n 
   · rw [WithBot.coe_le_coe, ENat.coe_add, ENat.coe_one, ENat.add_one_le_iff (ENat.coe_ne_top n),
       ← WithBot.coe_lt_coe, WithBot.coe_natCast]
 
-lemma WithBot.add_natCast_cancel (a b : WithBot ℕ∞) (c : ℕ) : a + c = b + c ↔ a = b := by
-  refine ⟨fun h ↦ ?_, fun h ↦ by rw [h]⟩
-  by_cases eqbot : a = ⊥
-  · simp [eqbot, WithBot.bot_add] at h
-    rw [WithBot.add_coe_eq_bot_iff.mp h.symm, eqbot]
-  · by_cases eqbot' : b = ⊥
-    · absurd eqbot
-      simpa [eqbot'] using h
-    · have : a.unbot eqbot + c = b.unbot eqbot' + c := by
-        apply WithBot.coe_inj.mp
-        convert h
-        repeat simpa using by rfl
-      rw [← WithBot.coe_unbot a eqbot, ← WithBot.coe_unbot b eqbot', WithBot.coe_inj]
-      simpa [ENat.add_right_cancel_iff _ _ _ (ENat.coe_ne_top c)] using this
+lemma WithBot.add_natCast_cancel (a b : WithBot ℕ∞) (c : ℕ) : a + c = b + c ↔ a = b :=
+  (IsAddRightRegular.all c).withTop.withBot.eq_iff
 
-lemma WithBot.natCast_add_cancel (a b : WithBot ℕ∞) (c : ℕ) : c + a = c + b ↔ a = b := by
-  rw [add_comm _ a, add_comm _ b]
-  exact WithBot.add_natCast_cancel a b c
+lemma WithBot.add_one_cancel (a b : WithBot ℕ∞) : a + 1 = b + 1 ↔ a = b :=
+  (IsAddRightRegular.all 1).withTop.withBot.eq_iff
+
+lemma WithBot.natCast_add_cancel (a b : WithBot ℕ∞) (c : ℕ) : c + a = c + b ↔ a = b :=
+  (IsAddLeftRegular.all c).withTop.withBot.eq_iff
+
+lemma WithBot.one_add_cancel (a b : WithBot ℕ∞) : 1 + a = 1 + b ↔ a = b :=
+  (IsAddLeftRegular.all 1).withTop.withBot.eq_iff
+
+lemma WithBot.add_le_add_natCast_right_iff (a b : WithBot ℕ∞) (c : ℕ) : a + c ≤ b + c ↔ a ≤ b :=
+  (Contravariant.AddLECancellable (a := c)).withTop.withBot.add_le_add_iff_right
+
+lemma WithBot.add_le_add_one_right_iff (a b : WithBot ℕ∞) : a + 1 ≤ b + 1 ↔ a ≤ b :=
+  WithBot.add_le_add_natCast_right_iff a b 1
+
+lemma WithBot.add_le_add_natCast_left_iff (a b : WithBot ℕ∞) (c : ℕ) : c + a ≤ c + b ↔ a ≤ b := by
+  rw [add_comm _ a, add_comm _ b, WithBot.add_le_add_natCast_right_iff]
+
+lemma WithBot.add_le_add_one_left_iff (a b : WithBot ℕ∞) : 1 + a ≤ 1 + b ↔ a ≤ b :=
+  WithBot.add_le_add_natCast_left_iff a b 1

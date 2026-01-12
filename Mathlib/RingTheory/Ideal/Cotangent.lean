@@ -6,6 +6,7 @@ Authors: Andrew Yang
 module
 
 public import Mathlib.Algebra.Module.Torsion.Basic
+public import Mathlib.Algebra.Module.SpanRank
 public import Mathlib.Algebra.Ring.Idempotent
 public import Mathlib.LinearAlgebra.Dimension.Finite
 public import Mathlib.LinearAlgebra.Dimension.FreeAndStrongRankCondition
@@ -50,7 +51,7 @@ def toCotangent : I →ₗ[R] I.Cotangent := Submodule.mkQ _
 
 theorem map_toCotangent_ker : (LinearMap.ker I.toCotangent).map I.subtype = I ^ 2 := by
   rw [Ideal.toCotangent, Submodule.ker_mkQ, pow_two, Submodule.map_smul'' I ⊤ (Submodule.subtype I),
-    Algebra.id.smul_eq_mul, Submodule.map_subtype_top]
+    smul_eq_mul, Submodule.map_subtype_top]
 
 theorem mem_toCotangent_ker {x : I} : x ∈ LinearMap.ker I.toCotangent ↔ (x : R) ∈ I ^ 2 := by
   rw [← I.map_toCotangent_ker]
@@ -81,7 +82,7 @@ def cotangentToQuotientSquare : I.Cotangent →ₗ[R] R ⧸ I ^ 2 :=
   Submodule.mapQ (I • ⊤) (I ^ 2) I.subtype
     (by
       rw [← Submodule.map_le_iff_le_comap, Submodule.map_smul'', Submodule.map_top,
-        Submodule.range_subtype, smul_eq_mul, pow_two] )
+        Submodule.range_subtype, smul_eq_mul, pow_two])
 
 theorem to_quotient_square_comp_toCotangent :
     I.cotangentToQuotientSquare.comp I.toCotangent = (I ^ 2).mkQ.comp (Submodule.subtype I) :=
@@ -103,7 +104,7 @@ lemma isTorsionBySet_cotangent :
 
 /-- `I ⧸ I ^ 2` as an ideal of `R ⧸ I ^ 2`. -/
 def cotangentIdeal (I : Ideal R) : Ideal (R ⧸ I ^ 2) :=
-  Submodule.map (Quotient.mk (I ^ 2)|>.toSemilinearMap) I
+  Submodule.map (Quotient.mk (I ^ 2) |>.toSemilinearMap) I
 
 theorem cotangentIdeal_square (I : Ideal R) : I.cotangentIdeal ^ 2 = ⊥ := by
   rw [eq_bot_iff, pow_two I.cotangentIdeal, ← smul_eq_mul]
@@ -151,15 +152,9 @@ theorem cotangentEquivIdeal_apply (x : I.Cotangent) :
     ↑(I.cotangentEquivIdeal x) = I.cotangentToQuotientSquare x := rfl
 
 theorem cotangentEquivIdeal_symm_apply (x : R) (hx : x ∈ I) :
-    -- Note: https://github.com/leanprover-community/mathlib4/pull/8386 had to specify `(R₂ := R)` because `I.toCotangent` suggested `R ⧸ I^2` instead
-    I.cotangentEquivIdeal.symm ⟨(I ^ 2).mkQ x,
-      -- timeout (200000 heartbeats) without `by exact`
-      by exact Submodule.mem_map_of_mem (F := R →ₗ[R] R ⧸ I ^ 2) (f := (I ^ 2).mkQ) hx⟩ =
-      I.toCotangent (R := R) ⟨x, hx⟩ := by
-  apply I.cotangentEquivIdeal.injective
-  rw [I.cotangentEquivIdeal.apply_symm_apply]
-  ext
-  rfl
+    I.cotangentEquivIdeal.symm ⟨(I ^ 2).mkQ x, Submodule.mem_map_of_mem hx⟩ =
+      I.toCotangent ⟨x, hx⟩ := by
+  simp [I.cotangentEquivIdeal.symm_apply_eq, Subtype.ext_iff]
 
 variable {A B : Type*} [CommRing A] [CommRing B] [Algebra R A] [Algebra R B]
 
@@ -171,6 +166,12 @@ def _root_.AlgHom.kerSquareLift (f : A →ₐ[R] B) : A ⧸ RingHom.ker f.toRing
     rw [IsScalarTower.algebraMap_apply R A, RingHom.toFun_eq_coe, Ideal.Quotient.algebraMap_eq,
       Ideal.Quotient.lift_mk]
     exact f.map_algebraMap r
+
+-- Can't be `simp`, because `RingHom.ker f.toRingHom` in the definition of `AlgHom.kerSquareLift`
+-- is not simp NF. Will be fixed by removing `RingHomClass` in the definition of `RingHom.ker`.
+-- (#25138)
+lemma _root_.AlgHom.kerSquareLift_mk (f : A →ₐ[R] B) (x : A) : f.kerSquareLift x = f x :=
+  rfl
 
 theorem _root_.AlgHom.ker_kerSquareLift (f : A →ₐ[R] B) :
     RingHom.ker f.kerSquareLift.toRingHom = (RingHom.ker f.toRingHom).cotangentIdeal := by
@@ -277,5 +278,45 @@ theorem finrank_cotangentSpace_le_one_iff [IsNoetherianRing R] :
     ← (map_injective_of_injective (injective_subtype _)).eq_iff, map_span, Set.image_singleton,
     Submodule.map_top, range_subtype, eq_comm (a := maximalIdeal R)]
   exact ⟨fun ⟨x, h⟩ ↦ ⟨_, h⟩, fun ⟨x, h⟩ ↦ ⟨⟨x, h ▸ subset_span (Set.mem_singleton x)⟩, h⟩⟩
+
+lemma spanFinrank_maximalIdeal_eq_finrank_cotangentSpace [IsNoetherianRing R] :
+    (maximalIdeal R).spanFinrank = Module.finrank (ResidueField R) (CotangentSpace R) := by
+  have eqtop (S : Set (maximalIdeal R)) : Submodule.span R S = ⊤ ↔
+    Submodule.span R ((Submodule.subtype (maximalIdeal R)) '' S) = maximalIdeal R := by
+    simp only [← Submodule.map_span, ← (maximalIdeal R).range_subtype , ← Submodule.map_top,
+    (Submodule.map_injective_of_injective (maximalIdeal R).injective_subtype).eq_iff]
+  have fg : Module.Finite (ResidueField R) (CotangentSpace R) := inferInstance
+  have fg' : Submodule.FG (maximalIdeal R) := Ideal.fg_of_isNoetherianRing (maximalIdeal R)
+  have : Submodule.spanFinrank (⊤ : Submodule (ResidueField R) (CotangentSpace R)) =
+    Module.rank (ResidueField R) (CotangentSpace R) := by
+    rw [← Submodule.fg_iff_spanRank_eq_spanFinrank.mpr fg.1, Submodule.rank_eq_spanRank_of_free]
+  simp only [← Module.finrank_eq_rank, Nat.cast_inj] at this
+  rw [← this]
+  apply le_antisymm
+  · have span : Submodule.span R
+      ((⊤ : Submodule (ResidueField R) (CotangentSpace R)).generators.image Quotient.out) = ⊤ := by
+      apply IsLocalRing.CotangentSpace.span_image_eq_top_iff.mp
+      convert Submodule.span_generators (⊤ : Submodule (ResidueField R) (CotangentSpace R))
+      have : ⇑(maximalIdeal R).toCotangent ∘ Quotient.out = id := by
+        ext
+        exact Submodule.Quotient.mk_out _
+      rw [← Set.image_comp, this, Set.image_id]
+    rw [eqtop, ← Set.image_comp] at span
+    rw [← Submodule.FG.generators_ncard fg.1, ← congrArg Submodule.spanFinrank span]
+    apply le_trans (Submodule.spanFinrank_span_le_ncard_of_finite
+      (Set.Finite.image _ fg.1.finite_generators)) (Set.ncard_image_le fg.1.finite_generators)
+  · let G := ({x | x.1 ∈ (maximalIdeal R).generators} : Set (maximalIdeal R))
+    have : Submodule.span R G = ⊤ := by
+      simp only [eqtop, Submodule.subtype_apply, Ideal.submodule_span_eq, G]
+      convert (maximalIdeal R).span_generators
+      ext
+      simpa using fun a ↦ Submodule.FG.generators_mem (maximalIdeal R) a
+    have fin : G.Finite :=
+      fg'.finite_generators.of_injOn (by simp [Set.MapsTo, G]) Set.injOn_subtype_val
+    rw [← IsLocalRing.CotangentSpace.span_image_eq_top_iff.mpr this,
+      ← Submodule.FG.generators_ncard fg']
+    apply le_trans (Submodule.spanFinrank_span_le_ncard_of_finite (fin.image _))
+    exact le_trans (Set.ncard_image_le fin) (Set.ncard_le_ncard_of_injOn Subtype.val (by simp [G])
+      Set.injOn_subtype_val fg'.finite_generators)
 
 end IsLocalRing

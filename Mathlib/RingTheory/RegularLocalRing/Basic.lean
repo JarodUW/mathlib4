@@ -5,8 +5,10 @@ Authors: Nailin Guan
 -/
 module
 
+public import Mathlib.LinearAlgebra.Dimension.OrzechProperty
 public import Mathlib.RingTheory.RegularLocalRing.Defs
 public import Mathlib.RingTheory.KrullDimension.Field
+public import Mathlib.RingTheory.KrullDimension.Regular
 public import Mathlib.RingTheory.Regular.RegularSequence
 
 /-!
@@ -46,20 +48,14 @@ lemma IsLocalRing.ResidueField.map_bijective_of_surjective [IsLocalRing R] {S : 
   apply Ideal.Quotient.lift_surjective_of_surjective
   convert Function.Surjective.comp (Ideal.Quotient.mk_surjective (I := (maximalIdeal S))) surj
 
-variable {R} in
-lemma _root_.ringKrullDim_le_ringKrullDim_add_card [IsLocalRing R] [IsNoetherianRing R]
-    {S : Finset R} (hS : (S : Set R) ⊆ maximalIdeal R) :
-    ringKrullDim R ≤ ringKrullDim (R ⧸ Ideal.span (S : Set R)) + S.card := by
-  sorry
-
 lemma quotient_isRegularLocalRing_tfae [IsRegularLocalRing R] (S : Finset R)
     (sub : (S : Set R) ⊆ maximalIdeal R) :
     [∃ (T : Finset R), S ⊆ T ∧ T.card = ringKrullDim R ∧ Ideal.span T = maximalIdeal R,
      LinearIndependent (ResidueField R) ((⇑(maximalIdeal R).toCotangent).comp (Set.inclusion sub)),
      IsRegularLocalRing (R ⧸ Ideal.span (S : Set R)) ∧
      (ringKrullDim (R ⧸ Ideal.span (S : Set R)) + S.card = ringKrullDim R)].TFAE := by
-  have : Nontrivial (R ⧸ Ideal.span (S : Set R)) :=
-    Ideal.Quotient.nontrivial (ne_top_of_le_ne_top Ideal.IsPrime.ne_top' (Ideal.span_le.mpr sub))
+  have : Nontrivial (R ⧸ Ideal.span (S : Set R)) := Ideal.Quotient.nontrivial_iff.mpr
+    (ne_top_of_le_ne_top Ideal.IsPrime.ne_top' (Ideal.span_le.mpr sub))
   have lochom : IsLocalHom (Ideal.Quotient.mk (Ideal.span (S : Set R))) :=
     IsLocalHom.of_surjective _ (Ideal.Quotient.mk_surjective)
   tfae_have 1 → 2 := by
@@ -104,7 +100,7 @@ lemma quotient_isRegularLocalRing_tfae [IsRegularLocalRing R] (S : Finset R)
         change (maximalIdeal (R ⧸ Ideal.span (S : Set R))).toCotangent ⟨(Ideal.Quotient.mkₐ R
           (Ideal.span (S : Set R))) x, _⟩ = 0 ↔ (maximalIdeal R).toCotangent x ∈ _
         simp only [Ideal.Quotient.mkₐ_eq_mk, Set.range_comp,
-          Submodule.span_image', Ideal.toCotangent_eq_zero]
+          Ideal.toCotangent_eq_zero, ← Submodule.map_span]
         have : maximalIdeal (R ⧸ Ideal.span (S : Set R)) =
           (maximalIdeal R).map (Ideal.Quotient.mk _) := by
           simp only [← ((local_hom_TFAE _).out 0 4).mp lochom,
@@ -165,7 +161,7 @@ lemma quotient_isRegularLocalRing_tfae [IsRegularLocalRing R] (S : Finset R)
       apply Module.finrank_quotient_add_finrank_le
     have : ringKrullDim (R ⧸ Ideal.span (S : Set R)) + S.card ≤
       (Submodule.spanFinrank (maximalIdeal (R ⧸ Ideal.span (S : Set R)))) + S.card :=
-      add_le_add_right (ringKrullDim_le_spanFinrank_maximalIdeal _) _
+      add_le_add_left (ringKrullDim_le_spanFinrank_maximalIdeal _) _
     exact ⟨(WithBot.add_natCast_cancel _ _ S.card).mp
       (le_antisymm (ge.trans le) this), le_antisymm (this.trans ge) le⟩
   tfae_have 3 → 1 := by

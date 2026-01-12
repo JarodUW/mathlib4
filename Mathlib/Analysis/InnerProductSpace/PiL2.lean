@@ -182,6 +182,9 @@ theorem EuclideanSpace.sphere_zero_eq {n : Type*} [Fintype n] (r : ℝ) (hr : 0 
 
 section
 
+instance EuclideanSpace.infinite [Nonempty ι] : Infinite (EuclideanSpace 𝕜 ι) :=
+  Module.Free.infinite 𝕜 _
+
 variable [Fintype ι]
 
 @[simp]
@@ -193,11 +196,18 @@ theorem finrank_euclideanSpace :
 theorem finrank_euclideanSpace_fin {n : ℕ} :
     Module.finrank 𝕜 (EuclideanSpace 𝕜 (Fin n)) = n := by simp
 
-theorem EuclideanSpace.inner_eq_star_dotProduct (x y : EuclideanSpace 𝕜 ι) :
+namespace EuclideanSpace
+
+scoped instance (n : ℕ) : Fact (Module.finrank 𝕜 (EuclideanSpace 𝕜 (Fin n)) = n) :=
+  ⟨finrank_euclideanSpace_fin⟩
+
+theorem inner_eq_star_dotProduct (x y : EuclideanSpace 𝕜 ι) :
     ⟪x, y⟫ = ofLp y ⬝ᵥ star (ofLp x) := rfl
 
-lemma EuclideanSpace.inner_toLp_toLp (x y : ι → 𝕜) :
+lemma inner_toLp_toLp (x y : ι → 𝕜) :
     ⟪toLp 2 x, toLp 2 y⟫ = dotProduct y (star x) := rfl
+
+end EuclideanSpace
 
 /-- A finite, mutually orthogonal family of subspaces of `E`, which span `E`, induce an isometry
 from `E` to `PiLp 2` of the subspaces equipped with the `L2` inner product. -/
@@ -227,7 +237,6 @@ theorem DirectSum.IsInternal.isometryL2OfOrthogonalFamily_symm_apply [DecidableE
     let e₁ := DirectSum.linearEquivFunOnFintype 𝕜 ι fun i => V i
     let e₂ := LinearEquiv.ofBijective (DirectSum.coeLinearMap V) hV
     suffices ∀ v : ⨁ i, V i, e₂ v = ∑ i, e₁ v i by exact this (e₁.symm w)
-    intro v
     simp [e₁, e₂, DirectSum.coeLinearMap, DirectSum.toModule, DFinsupp.lsum,
       DFinsupp.sumAddHom_apply]
 
@@ -373,8 +382,8 @@ instance instFunLike : FunLike (OrthonormalBasis ι 𝕜 E) ι E where
         have : k = k • (1 : 𝕜) := by rw [smul_eq_mul, mul_one]
         rw [this, Pi.single_smul]
         replace h := congr_fun h i
-        simp only [LinearEquiv.comp_coe, map_smul, LinearEquiv.coe_coe,
-          LinearEquiv.trans_apply, WithLp.linearEquiv_symm_apply, EuclideanSpace.toLp_single,
+        simp only [LinearEquiv.comp_coe, map_smul, LinearEquiv.coe_coe, LinearEquiv.trans_apply,
+          coe_symm_linearEquiv, EuclideanSpace.toLp_single,
           LinearIsometryEquiv.coe_symm_toLinearEquiv] at h ⊢
         rw [h]
 
@@ -448,8 +457,7 @@ protected theorem coe_toBasis_repr (b : OrthonormalBasis ι 𝕜 E) :
 @[simp]
 protected theorem coe_toBasis_repr_apply (b : OrthonormalBasis ι 𝕜 E) (x : E) (i : ι) :
     b.toBasis.repr x i = b.repr x i := by
-  rw [← Basis.equivFun_apply, OrthonormalBasis.coe_toBasis_repr]
-  rfl
+  simp [← Basis.equivFun_apply]
 
 protected theorem sum_repr (b : OrthonormalBasis ι 𝕜 E) (x : E) : ∑ i, b.repr x i • b i = x := by
   simp_rw [← b.coe_toBasis_repr_apply, ← b.coe_toBasis]
@@ -478,8 +486,6 @@ lemma sum_sq_norm_inner_right (b : OrthonormalBasis ι 𝕜 E) (x : E) :
     norm_star, ← pow_two]
   rw [Real.sq_sqrt]
   exact Fintype.sum_nonneg fun _ ↦ by positivity
-
-@[deprecated (since := "2025-06-23")] alias sum_sq_norm_inner := sum_sq_norm_inner_right
 
 lemma sum_sq_norm_inner_left (b : OrthonormalBasis ι 𝕜 E) (x : E) :
     ∑ i, ‖⟪x, b i⟫‖ ^ 2 = ‖x‖ ^ 2 := by
